@@ -31,7 +31,7 @@ export default function DashboardPage() {
     )
   }
 
-  // Don't render if not authenticated
+  // Don&apos;t render if not authenticated
   if (!user) {
     return null
   }

@@ -2,7 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #181A2F;
-  color: white;
+@layer base {
+  :root {
+    --background: 60 100% 99%;
+    --foreground: 75 42% 35%;
+    --card: 60 100% 99%;
+    --card-foreground: 75 42% 35%;
+    --popover: 60 100% 99%;
+    --popover-foreground: 75 42% 35%;
+    --primary: 75 42% 35%;
+    --primary-foreground: 60 100% 99%;
+    --secondary: 84 47% 74%;
+    --secondary-foreground: 75 42% 35%;
+    --muted: 84 47% 74%;
+    --muted-foreground: 75 42% 35%;
+    --accent: 84 47% 74%;
+    --accent-foreground: 75 42% 35%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 60 100% 99%;
+    --border: 84 47% 74%;
+    --input: 84 47% 74%;
+    --ring: 75 42% 35%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 75 42% 35%;
+    --foreground: 60 100% 99%;
+    --card: 75 42% 35%;
+    --card-foreground: 60 100% 99%;
+    --popover: 75 42% 35%;
+    --popover-foreground: 60 100% 99%;
+    --primary: 84 47% 74%;
+    --primary-foreground: 75 42% 35%;
+    --secondary: 75 42% 35%;
+    --secondary-foreground: 60 100% 99%;
+    --muted: 75 42% 35%;
+    --muted-foreground: 84 47% 74%;
+    --accent: 75 42% 35%;
+    --accent-foreground: 60 100% 99%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 100% 99%;
+    --border: 75 42% 35%;
+    --input: 75 42% 35%;
+    --ring: 84 47% 74%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    @apply backdrop-blur-xl bg-white/20 border border-white/30;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-[#8AA624] via-[#FEA405] to-[#8AA624] bg-clip-text text-transparent;
+  }
+  
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(138, 166, 36, 0.4);
+  }
+
+  .bg-primary-gradient {
+    background: linear-gradient(135deg, #8AA624 0%, #FEA405 100%);
+  }
+
+  .bg-secondary-gradient {
+    background: linear-gradient(135deg, #DBE4C9 0%, #FFFFF0 100%);
+  }
+
+  .text-primary-color {
+    color: #8AA624;
+  }
+
+  .text-secondary-color {
+    color: #DBE4C9;
+  }
+
+  .text-accent-color {
+    color: #FEA405;
+  }
+
+  .text-light-color {
+    color: #FFFFF0;
+  }
 } 

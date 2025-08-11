@@ -2,17 +2,15 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-
-interface User {
-  id: string
-  username: string
-  email: string
-}
+import { supabase } from './supabase'
+import { User, Session, AuthError } from '@supabase/supabase-js'
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<boolean>
-  logout: () => void
+  session: Session | null
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signup: (email: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -20,60 +18,114 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const checkAuth = () => {
-      const storedUser = localStorage.getItem('lambdaliga_user')
-      if (storedUser) {
-        try {
-          const userData = JSON.parse(storedUser)
-          setUser(userData)
-        } catch (error) {
-          localStorage.removeItem('lambdaliga_user')
-        }
-      }
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+      setUser(session?.user ?? null)
       setIsLoading(false)
     }
 
-    checkAuth()
+    getInitialSession()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+        setIsLoading(false)
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true)
-    
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      setIsLoading(true)
       
-      // For demo purposes, create a mock user
-      const mockUser: User = {
-        id: '1',
-        username: email.split('@')[0], // Use email prefix as username
-        email: email
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
       }
-      
-      setUser(mockUser)
-      localStorage.setItem('lambdaliga_user', JSON.stringify(mockUser))
-      return true
+
+      if (data.user) {
+        setUser(data.user)
+        setSession(data.session)
+        return { success: true }
+      }
+
+      return { success: false, error: 'Login failed' }
     } catch (error) {
-      return false
+      return { success: false, error: 'An unexpected error occurred' }
     } finally {
       setIsLoading(false)
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('lambdaliga_user')
-    router.push('/login')
+  const signup = async (email: string, password: string, username: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true)
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username,
+          }
+        }
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      if (data.user) {
+        // For email confirmation flow, user might not have session immediately
+        if (data.session) {
+          setUser(data.user)
+          setSession(data.session)
+          return { success: true }
+        } else {
+          // Email confirmation required
+          return { success: true, error: 'Please check your email for confirmation link' }
+        }
+      }
+
+      return { success: false, error: 'Signup failed' }
+    } catch (error) {
+      return { success: false, error: 'An unexpected error occurred' }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   const value = {
     user,
+    session,
     login,
+    signup,
     logout,
     isLoading
   }

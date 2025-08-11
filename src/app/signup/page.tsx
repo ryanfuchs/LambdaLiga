@@ -18,8 +18,10 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [signupError, setSignupError] = useState('')
+  const [signupSuccess, setSignupSuccess] = useState('')
   const router = useRouter()
-  const { login } = useAuth()
+  const { signup } = useAuth()
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -60,6 +62,8 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSignupError('')
+    setSignupSuccess('')
     
     if (!validateForm()) {
       return
@@ -68,16 +72,28 @@ export default function SignupPage() {
     setLoading(true)
     
     try {
-      // Simulate account creation
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const result = await signup(formData.email, formData.password, formData.username)
       
-      // Auto-login after successful signup
-      const success = await login(formData.email, formData.password)
-      if (success) {
-        router.push('/dashboard')
+      if (result.success) {
+        if (result.error) {
+          // Email confirmation required
+          setSignupSuccess(result.error)
+          // Clear form
+          setFormData({
+            username: '',
+            email: '',
+            password: '',
+            confirmPassword: ''
+          })
+        } else {
+          // Direct login success
+          router.push('/dashboard')
+        }
+      } else {
+        setSignupError(result.error || 'Signup failed')
       }
     } catch (error) {
-      console.error('Signup error:', error)
+      setSignupError('An unexpected error occurred')
     } finally {
       setLoading(false)
     }
@@ -106,6 +122,18 @@ export default function SignupPage() {
         {/* Signup Form */}
         <div className="glass-effect rounded-3xl p-8 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {signupError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                {signupError}
+              </div>
+            )}
+
+            {signupSuccess && (
+              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg text-sm">
+                {signupSuccess}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-lambdaliga-primary">Username</label>
               <Input

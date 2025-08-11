@@ -22,11 +22,11 @@ export default function LoginPage() {
     setError('')
     
     try {
-      const success = await login(email, password)
-      if (success) {
+      const result = await login(email, password)
+      if (result.success) {
         router.push('/dashboard')
       } else {
-        setError('Invalid email or password')
+        setError(result.error || 'Login failed')
       }
     } catch (error) {
       setError('An error occurred during login')

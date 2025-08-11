@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useAuth } from '@/lib/auth-context'
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -16,6 +18,8 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const router = useRouter()
+  const { login } = useAuth()
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -63,9 +67,20 @@ export default function SignupPage() {
 
     setLoading(true)
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setLoading(false)
+    try {
+      // Simulate account creation
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Auto-login after successful signup
+      const success = await login(formData.email, formData.password)
+      if (success) {
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      console.error('Signup error:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -233,7 +248,7 @@ export default function SignupPage() {
               loading={loading}
               className="h-12 text-base font-semibold"
             >
-              Create Account
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
 

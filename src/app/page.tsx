@@ -2,13 +2,23 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 
 export default function HomePage() {
   const router = useRouter()
+  const { user, isLoading } = useAuth()
 
   useEffect(() => {
-    router.push('/login')
-  }, [router])
+    if (!isLoading) {
+      if (user) {
+        // User is logged in, redirect to dashboard
+        router.push('/dashboard')
+      } else {
+        // User is not logged in, redirect to login
+        router.push('/login')
+      }
+    }
+  }, [user, isLoading, router])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-lambdaliga-light via-lambdaliga-secondary to-lambdaliga-light flex items-center justify-center">
@@ -17,7 +27,7 @@ export default function HomePage() {
           <span className="text-3xl font-bold text-white">LL</span>
         </div>
         <h1 className="text-4xl font-bold text-lambdaliga-primary mb-4">LambdaLiga</h1>
-        <p className="text-gray-600 text-lg">Redirecting to login...</p>
+        <p className="text-gray-600 text-lg">Loading...</p>
       </div>
     </div>
   )

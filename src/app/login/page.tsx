@@ -5,24 +5,34 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
   const router = useRouter()
+  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError('')
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setLoading(false)
-    
-    // Redirect to dashboard after successful login
-    router.push('/dashboard')
+    try {
+      const success = await login(email, password)
+      if (success) {
+        router.push('/dashboard')
+      } else {
+        setError('Invalid email or password')
+      }
+    } catch (error) {
+      setError('An error occurred during login')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -48,6 +58,12 @@ export default function LoginPage() {
         {/* Login Form */}
         <div className="glass-effect rounded-3xl p-8 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-lambdaliga-primary">Email</label>
               <Input

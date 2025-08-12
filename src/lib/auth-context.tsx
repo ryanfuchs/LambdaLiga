@@ -91,6 +91,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.user) {
+        // Create profile in profiles table
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: data.user.id,
+                username: username
+              }
+            ])
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError)
+            // Don't fail signup if profile creation fails
+          }
+        } catch (profileError) {
+          console.error('Error creating profile:', profileError)
+        }
+
         // For email confirmation flow, user might not have session immediately
         if (data.session) {
           setUser(data.user)

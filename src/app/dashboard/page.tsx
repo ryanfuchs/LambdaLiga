@@ -52,6 +52,17 @@ export default function DashboardPage() {
               <span className="text-xl font-bold text-lambdaliga-primary">LambdaLiga</span>
             </div>
             <div className="flex items-center space-x-4">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push('/game')}
+                className="bg-lambdaliga-primary text-white hover:bg-lambdaliga-accent border-lambdaliga-primary"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Play Game
+              </Button>
               <span className="text-gray-600">Welcome, <span className="font-semibold text-lambdaliga-primary">{username}</span>!</span>
               <Button variant="outline" size="sm">
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,7 +163,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-xl font-bold text-lambdaliga-primary mb-4">Quick Match</h3>
             <p className="text-gray-600 mb-6">Jump into a fast-paced game and test your skills against players of similar level.</p>
-            <Button variant="gradient" fullWidth>
+            <Button variant="gradient" fullWidth onClick={() => router.push('/game')}>
               Play Now
             </Button>
           </div>

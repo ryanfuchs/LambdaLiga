@@ -3,6 +3,10 @@ CREATE TABLE IF NOT EXISTS games (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     status TEXT NOT NULL CHECK (status IN ('lobby', 'playing', 'played', 'cancelled')) DEFAULT 'lobby',
     winner TEXT CHECK (winner IN ('red', 'blue')),
+    red_team_size INTEGER NOT NULL DEFAULT 1 CHECK (red_team_size IN (1, 2)),
+    blue_team_size INTEGER NOT NULL DEFAULT 1 CHECK (blue_team_size IN (1, 2)),
+    red_score INTEGER,
+    blue_score INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

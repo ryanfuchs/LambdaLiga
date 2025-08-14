@@ -10,6 +10,10 @@ interface Game {
   id: string
   status: 'lobby' | 'playing' | 'played' | 'cancelled'
   winner?: 'red' | 'blue'
+  red_team_size: number
+  blue_team_size: number
+  red_score?: number
+  blue_score?: number
   created_at: string
   updated_at: string
 }
@@ -26,6 +30,39 @@ export default function GamePage() {
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const [joiningTeam, setJoiningTeam] = useState<'red' | 'blue' | null>(null)
+  const [redTeamSize, setRedTeamSize] = useState(1)
+  const [blueTeamSize, setBlueTeamSize] = useState(1)
+
+  const updateTeamSize = async (team: 'red' | 'blue', size: number) => {
+    if (!game || game.status !== 'lobby') return
+    
+    try {
+      const { error } = await supabase
+        .from('games')
+        .update({ 
+          [`${team}_team_size`]: size 
+        })
+        .eq('id', game.id)
+
+      if (error) {
+        console.error(`Error updating ${team} team size:`, error)
+        return
+      }
+
+      // Update local state
+      setGame({ ...game, [`${team}_team_size`]: size })
+      
+      if (team === 'red') {
+        setRedTeamSize(size)
+      } else {
+        setBlueTeamSize(size)
+      }
+
+      console.log(`${team} team size updated to ${size}`)
+    } catch (error) {
+      console.error(`Error updating ${team} team size:`, error)
+    }
+  }
 
   useEffect(() => {
     if (user) {
@@ -118,6 +155,119 @@ export default function GamePage() {
     }
   }
 
+  // Game Result Submission Component
+  const GameResultSubmission = ({ onGameEnd }: { onGameEnd: (winner: 'red' | 'blue', redScore: number, blueScore: number) => void }) => {
+    const [redScore, setRedScore] = useState<number>(0)
+    const [blueScore, setBlueScore] = useState<number>(0)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+
+    // Automatically determine winner based on scores
+    const winner = redScore > blueScore ? 'red' : blueScore > redScore ? 'blue' : null
+    const isTie = redScore === blueScore && redScore > 0
+
+    const handleSubmit = async () => {
+      if (isTie) {
+        alert('Please set different scores for the teams')
+        return
+      }
+      
+      if (redScore === 0 && blueScore === 0) {
+        alert('Please set scores for both teams')
+        return
+      }
+      
+      setIsSubmitting(true)
+      await onGameEnd(winner!, redScore, blueScore)
+      setIsSubmitting(false)
+    }
+
+    return (
+      <div className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border border-lambdaliga-secondary">
+        <h3 className="text-xl font-bold text-lambdaliga-primary mb-6 text-center">Game Result Submission</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Red Team Score */}
+          <div className="text-center">
+            <label className="block text-red-600 font-semibold mb-2">Red Team Score</label>
+            <div className="flex justify-center space-x-2">
+              <button
+                onClick={() => setRedScore(Math.max(0, redScore - 1))}
+                className="w-10 h-10 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-bold text-lg"
+              >
+                -
+              </button>
+              <span className="w-16 h-10 bg-red-50 border border-red-300 rounded-lg flex items-center justify-center text-red-800 font-bold text-xl">
+                {redScore}
+              </span>
+              <button
+                onClick={() => setRedScore(redScore + 1)}
+                className="w-10 h-10 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-bold text-lg"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Blue Team Score */}
+          <div className="text-center">
+            <label className="block text-blue-600 font-semibold mb-2">Blue Team Score</label>
+            <div className="flex justify-center space-x-2">
+              <button
+                onClick={() => setBlueScore(Math.max(0, blueScore - 1))}
+                className="w-10 h-10 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-bold text-lg"
+              >
+                -
+              </button>
+              <span className="w-16 h-10 bg-blue-50 border border-blue-300 rounded-lg flex items-center justify-center text-blue-800 font-bold text-xl">
+                {blueScore}
+              </span>
+              <button
+                onClick={() => setBlueScore(blueScore + 1)}
+                className="w-10 h-10 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-bold text-lg"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Winner Display */}
+        <div className="text-center mb-6">
+          {winner && !isTie ? (
+            <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+              <p className="text-green-800 font-medium">
+                🏆 {winner === 'red' ? 'Red Team' : 'Blue Team'} will win with {winner === 'red' ? redScore : blueScore} points
+              </p>
+            </div>
+          ) : isTie ? (
+            <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+              <p className="text-yellow-800 font-medium">
+                ⚠️ It's a tie! Please set different scores
+              </p>
+            </div>
+          ) : redScore === 0 && blueScore === 0 ? (
+            <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
+              <p className="text-gray-800 font-medium">
+                📊 Set scores to see the winner
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Submit Button */}
+        <div className="text-center">
+          <Button
+            onClick={handleSubmit}
+            disabled={isTie || (redScore === 0 && blueScore === 0) || isSubmitting}
+            className="bg-lambdaliga-primary hover:bg-lambdaliga-accent text-white px-8 py-3 text-lg border-lambdaliga-primary hover:border-lambdaliga-accent disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Result'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const loadGame = async () => {
     try {
       setLoading(true)
@@ -178,7 +328,9 @@ export default function GamePage() {
         .from('games')
         .insert([
           {
-            status: 'lobby'
+            status: 'lobby',
+            red_team_size: redTeamSize,
+            blue_team_size: blueTeamSize
           }
         ])
         .select()
@@ -340,7 +492,7 @@ export default function GamePage() {
     }
   }
 
-  const endGame = async (winner: 'red' | 'blue') => {
+  const endGame = async (winner: 'red' | 'blue', redScore: number, blueScore: number) => {
     if (!game) return
 
     try {
@@ -348,7 +500,9 @@ export default function GamePage() {
         .from('games')
         .update({ 
           status: 'played',
-          winner: winner
+          winner: winner,
+          red_score: redScore,
+          blue_score: blueScore
         })
         .eq('id', game.id)
 
@@ -357,7 +511,13 @@ export default function GamePage() {
         return
       }
 
-      setGame({ ...game, status: 'played' })
+      setGame({ ...game, status: 'played', red_score: redScore, blue_score: blueScore })
+      console.log(`Game ended. ${winner} team wins! Final score: Red ${redScore} - Blue ${blueScore}`)
+      
+      // Redirect to main page after a short delay
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 1500)
     } catch (error) {
       console.error('Error ending game:', error)
     }
@@ -385,8 +545,22 @@ export default function GamePage() {
 
   const canStartGame = game && 
     game.status === 'lobby' && 
-    players.filter(p => p.team === 'red').length >= 1 && 
-    players.filter(p => p.team === 'blue').length >= 1
+    players.length >= 1
+
+  // Debug logging for start game conditions
+  console.log('Start Game Debug:', {
+    gameExists: !!game,
+    gameStatus: game?.status,
+    redTeamPlayers: players.filter(p => p.team === 'red').length,
+    redTeamRequired: game?.red_team_size || 1,
+    blueTeamPlayers: players.filter(p => p.team === 'blue').length,
+    blueTeamRequired: game?.blue_team_size || 1,
+    canStart: canStartGame
+  })
+
+  const redTeamFull = players.filter(p => p.team === 'red').length >= (game?.red_team_size || 1)
+  const blueTeamFull = players.filter(p => p.team === 'blue').length >= (game?.blue_team_size || 1)
+  const teamsBalanced = redTeamFull && blueTeamFull
 
   const isPlayerInGame = players.some(p => p.id === user?.id)
   const playerTeam = players.find(p => p.id === user?.id)?.team
@@ -461,6 +635,33 @@ export default function GamePage() {
           }`}>
             {game?.status?.toUpperCase()}
           </div>
+          
+          {/* Show final scores if game is finished */}
+          {game?.status === 'played' && game.red_score !== undefined && game.blue_score !== undefined && (
+            <div className="mt-4 p-4 bg-white/60 backdrop-blur-md rounded-xl border border-lambdaliga-secondary">
+              <h4 className="text-lg font-semibold text-lambdaliga-primary mb-2">Final Score</h4>
+              <div className="flex justify-center items-center space-x-8">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{game.red_score}</div>
+                  <div className="text-sm text-red-600">Red Team</div>
+                </div>
+                <div className="text-3xl font-bold text-gray-400">-</div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{game.blue_score}</div>
+                  <div className="text-sm text-blue-600">Blue Team</div>
+                </div>
+              </div>
+              {game.winner && (
+                <div className="mt-2 text-center">
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold text-white ${
+                    game.winner === 'red' ? 'bg-red-500' : 'bg-blue-500'
+                  }`}>
+                    {game.winner.charAt(0).toUpperCase() + game.winner.slice(1)} Team Wins!
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Game ID */}
@@ -468,11 +669,92 @@ export default function GamePage() {
           Game ID: {game?.id}
         </div>
 
+        {/* Team Size Selection - Only show in lobby */}
+        {game?.status === 'lobby' && (
+          <div className="bg-white/60 backdrop-blur-md rounded-2xl p-6 border border-lambdaliga-secondary mb-8">
+            <h3 className="text-xl font-bold text-lambdaliga-primary mb-4 text-center">Team Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Red Team Size */}
+              <div className="text-center">
+                <label className="block text-red-600 font-semibold mb-2">Red Team Size</label>
+                <div className="flex justify-center space-x-2">
+                  <button
+                    onClick={() => updateTeamSize('red', 1)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      (game?.red_team_size || 1) === 1 
+                        ? 'bg-red-500 text-white' 
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
+                    1 Player
+                  </button>
+                  <button
+                    onClick={() => updateTeamSize('red', 2)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      (game?.red_team_size || 1) === 2 
+                        ? 'bg-red-500 text-white' 
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
+                    2 Players
+                  </button>
+                </div>
+              </div>
+
+              {/* Blue Team Size */}
+              <div className="text-center">
+                <label className="block text-blue-600 font-semibold mb-2">Blue Team Size</label>
+                <div className="flex justify-center space-x-2">
+                  <button
+                    onClick={() => updateTeamSize('blue', 1)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      (game?.blue_team_size || 1) === 1 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
+                  >
+                    1 Player
+                  </button>
+                  <button
+                    onClick={() => updateTeamSize('blue', 2)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      (game?.blue_team_size || 1) === 2 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    }`}
+                  >
+                    2 Players
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ELO Ranking Message */}
+            {!teamsBalanced && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-yellow-800 font-medium">
+                    Game will be ranked with the ELO of an average player due to unbalanced teams
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Teams Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Red Team */}
           <div className="bg-white/80 backdrop-blur-md border-2 border-red-500 rounded-2xl p-6 shadow-lg">
             <h2 className="text-2xl font-bold text-red-600 mb-4 text-center">Red Team</h2>
+            <div className="text-center mb-3">
+              <span className="text-sm text-red-600 bg-red-100 px-3 py-1 rounded-full">
+                {players.filter(p => p.team === 'red').length}/{game?.red_team_size || 1} Players
+              </span>
+            </div>
             <div className="space-y-3">
               {players.filter(p => p.team === 'red').map((player, index) => (
                 <div key={player.id} className="bg-red-100 border border-red-300 p-3 rounded-xl text-center text-red-800 font-medium">
@@ -482,7 +764,7 @@ export default function GamePage() {
               {players.filter(p => p.team === 'red').length === 0 && (
                 <div className="text-red-400 text-center py-6">No players</div>
               )}
-              {players.filter(p => p.team === 'red').length < 2 && game?.status === 'lobby' && (
+              {players.filter(p => p.team === 'red').length < (game?.red_team_size || 1) && game?.status === 'lobby' && (
                 !isPlayerInGame ? (
                   <Button
                     onClick={() => joinTeam('red')}
@@ -511,6 +793,11 @@ export default function GamePage() {
           {/* Blue Team */}
           <div className="bg-white/80 backdrop-blur-md border-2 border-blue-500 rounded-2xl p-6 shadow-lg">
             <h2 className="text-2xl font-bold text-blue-600 mb-4 text-center">Blue Team</h2>
+            <div className="text-center mb-3">
+              <span className="text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
+                {players.filter(p => p.team === 'blue').length}/{game?.blue_team_size || 1} Players
+              </span>
+            </div>
             <div className="space-y-3">
               {players.filter(p => p.team === 'blue').map((player, index) => (
                 <div key={player.id} className="bg-blue-100 border border-blue-300 p-3 rounded-xl text-center text-blue-800 font-medium">
@@ -520,14 +807,28 @@ export default function GamePage() {
               {players.filter(p => p.team === 'blue').length === 0 && (
                 <div className="text-blue-400 text-center py-6">No players</div>
               )}
-              {players.filter(p => p.team === 'blue').length < 2 && game?.status === 'lobby' && !isPlayerInGame && (
-                <Button
-                  onClick={() => joinTeam('blue')}
-                  disabled={joiningTeam === 'blue'}
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white border-blue-500 hover:border-blue-600"
-                >
-                  {joiningTeam === 'blue' ? 'Joining...' : 'Join Blue Team'}
-                </Button>
+              {players.filter(p => p.team === 'blue').length < (game?.blue_team_size || 1) && game?.status === 'lobby' && (
+                !isPlayerInGame ? (
+                  <Button
+                    onClick={() => joinTeam('blue')}
+                    disabled={joiningTeam === 'blue'}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white border-blue-500 hover:border-blue-600"
+                  >
+                    {joiningTeam === 'blue' ? 'Joining...' : 'Join Blue Team'}
+                  </Button>
+                ) : playerTeam === 'red' ? (
+                  <Button
+                    onClick={() => joinTeam('blue')}
+                    disabled={joiningTeam === 'blue'}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white border-blue-500 hover:border-blue-600"
+                  >
+                    {joiningTeam === 'blue' ? 'Switching...' : 'Switch to Blue Team'}
+                  </Button>
+                ) : playerTeam === 'blue' ? (
+                  <div className="text-center py-2 px-4 bg-blue-100 border border-blue-300 rounded-lg text-blue-800 font-medium">
+                    You are here
+                  </div>
+                ) : null
               )}
             </div>
           </div>
@@ -546,30 +847,36 @@ export default function GamePage() {
 
         {/* Game Controls */}
         <div className="flex flex-wrap gap-4 justify-center">
-          {game?.status === 'lobby' && canStartGame && (
-            <Button
-              onClick={startGame}
-              className="bg-lambdaliga-primary hover:bg-lambdaliga-accent text-white px-8 py-3 text-lg border-lambdaliga-primary hover:border-lambdaliga-accent"
-            >
-              Start Game
-            </Button>
+          {/* Start Game Button - Always show in lobby with status */}
+          {game?.status === 'lobby' && (
+            <div className="w-full text-center">
+              {canStartGame ? (
+                <Button
+                  onClick={startGame}
+                  className="bg-lambdaliga-primary hover:bg-lambdaliga-accent text-white px-8 py-3 text-lg border-lambdaliga-primary hover:border-lambdaliga-accent"
+                >
+                  🚀 Start Game
+                </Button>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
+                  <div className="flex items-center justify-center">
+                    <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span className="text-yellow-800 font-medium">
+                      Need at least 1 player to start
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm text-yellow-700 text-center">
+                    Total Players: {players.length}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {game?.status === 'playing' && (
-            <>
-              <Button
-                onClick={() => endGame('red')}
-                className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 text-lg border-red-500 hover:border-red-600"
-              >
-                Red Team Wins
-              </Button>
-              <Button
-                onClick={() => endGame('blue')}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg border-blue-500 hover:border-blue-600"
-              >
-                Blue Team Wins
-              </Button>
-            </>
+            <GameResultSubmission onGameEnd={endGame} />
           )}
 
           {game?.status === 'lobby' && (

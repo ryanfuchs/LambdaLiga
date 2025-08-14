@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
@@ -64,13 +64,7 @@ export default function GamePage() {
     }
   }
 
-  useEffect(() => {
-    if (user) {
-      ensureProfileExists()
-    }
-  }, [user])
-
-  const ensureProfileExists = async () => {
+  const ensureProfileExists = useCallback(async () => {
     if (!user) return
     
     try {
@@ -115,7 +109,9 @@ export default function GamePage() {
       // Still try to load game even if profile creation fails
       loadGame()
     }
-  }
+  }, [user, loadGame])
+
+  }, [user, ensureProfileExists])
 
   const cleanupDuplicateLobbyGames = async () => {
     try {

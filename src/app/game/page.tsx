@@ -109,9 +109,7 @@ export default function GamePage() {
       // Still try to load game even if profile creation fails
       loadGame()
     }
-  }, [user, loadGame])
-
-  }, [user, ensureProfileExists])
+  }, [user])
 
   const cleanupDuplicateLobbyGames = async () => {
     try {
@@ -238,7 +236,7 @@ export default function GamePage() {
           ) : isTie ? (
             <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
               <p className="text-yellow-800 font-medium">
-                ⚠️ It's a tie! Please set different scores
+                ⚠️ It&apos;s a tie! Please set different scores
               </p>
             </div>
           ) : redScore === 0 && blueScore === 0 ? (
@@ -264,7 +262,7 @@ export default function GamePage() {
     )
   }
 
-  const loadGame = async () => {
+  const loadGame = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -314,7 +312,7 @@ export default function GamePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   const createNewGame = async () => {
     try {
@@ -538,6 +536,13 @@ export default function GamePage() {
       console.error('Error cancelling game:', error)
     }
   }
+
+  // Effect to load game when user changes
+  useEffect(() => {
+    if (user) {
+      ensureProfileExists()
+    }
+  }, [user, ensureProfileExists])
 
   const canStartGame = game && 
     game.status === 'lobby' && 

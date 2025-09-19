@@ -266,7 +266,7 @@ export default function GamePage() {
     try {
       setLoading(true)
       
-      // First, try to find any existing active game (lobby, playing, or recent finished games)
+      // Only look for active games (lobby or playing)
       const { data: existingGames, error: gameError } = await supabase
         .from('games')
         .select('*')
@@ -281,31 +281,13 @@ export default function GamePage() {
       if (existingGames && existingGames.length > 0) {
         // Use the most recent active game
         const existingGame = existingGames[0]
-        console.log('Found existing game:', existingGame.id, 'with status:', existingGame.status)
+        console.log('Found existing active game:', existingGame.id, 'with status:', existingGame.status)
         setGame(existingGame)
         await loadPlayers(existingGame.id)
       } else {
-        // Check for very recent finished games (within last 5 minutes) to avoid creating new ones too quickly
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        const { data: recentGames } = await supabase
-          .from('games')
-          .select('*')
-          .in('status', ['played', 'cancelled'])
-          .gte('updated_at', fiveMinutesAgo)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-
-        if (recentGames && recentGames.length > 0) {
-          // Use the most recent finished game
-          const recentGame = recentGames[0]
-          console.log('Found recent finished game:', recentGame.id, 'with status:', recentGame.status)
-          setGame(recentGame)
-          await loadPlayers(recentGame.id)
-        } else {
-          // No recent games found, create a new one
-          console.log('No recent games found, creating new game...')
-          await createNewGame()
-        }
+        // No active games found, create a new one
+        console.log('No active games found, creating new game...')
+        await createNewGame()
       }
     } catch (error) {
       console.error('Error in loadGame:', error)
@@ -318,13 +300,17 @@ export default function GamePage() {
     try {
       console.log('Creating new game...')
       
+      // Reset team sizes to default
+      setRedTeamSize(1)
+      setBlueTeamSize(1)
+      
       const { data: newGame, error } = await supabase
         .from('games')
         .insert([
           {
             status: 'lobby',
-            red_team_size: redTeamSize,
-            blue_team_size: blueTeamSize
+            red_team_size: 1,
+            blue_team_size: 1
           }
         ])
         .select()
@@ -487,7 +473,10 @@ export default function GamePage() {
   }
 
   const endGame = async (winner: 'red' | 'blue', redScore: number, blueScore: number) => {
-    if (!game) return
+    if (!game || game.status === 'played') {
+      console.log('Game already ended or no game available')
+      return
+    }
 
     try {
       const { error } = await supabase
@@ -499,21 +488,27 @@ export default function GamePage() {
           blue_score: blueScore
         })
         .eq('id', game.id)
+        .eq('status', 'playing') // Only update if still playing to prevent duplicate submissions
 
       if (error) {
         console.error('Error ending game:', error)
+        alert('Failed to submit game result. Please try again.')
         return
       }
 
-      setGame({ ...game, status: 'played', red_score: redScore, blue_score: blueScore })
+      setGame({ ...game, status: 'played', winner: winner, red_score: redScore, blue_score: blueScore })
       console.log(`Game ended. ${winner} team wins! Final score: Red ${redScore} - Blue ${blueScore}`)
       
-      // Redirect to main page after a short delay
+      // Show success message and redirect to main page
+      alert(`Game completed! ${winner.charAt(0).toUpperCase() + winner.slice(1)} team wins! Final score: Red ${redScore} - Blue ${blueScore}`)
+      
+      // Redirect to dashboard after showing the result
       setTimeout(() => {
         window.location.href = '/dashboard'
-      }, 1500)
+      }, 2000)
     } catch (error) {
       console.error('Error ending game:', error)
+      alert('Failed to submit game result. Please try again.')
     }
   }
 
@@ -543,6 +538,40 @@ export default function GamePage() {
       ensureProfileExists()
     }
   }, [user, ensureProfileExists])
+
+  // Real-time subscription to game updates
+  useEffect(() => {
+    if (!game) return
+
+    const channel = supabase
+      .channel(`game-${game.id}`)
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'games', 
+          filter: `id=eq.${game.id}` 
+        }, 
+        (payload) => {
+          console.log('Game updated:', payload.new)
+          const updatedGame = payload.new as Game
+          setGame(updatedGame)
+          
+          // If game just ended, show result and redirect
+          if (updatedGame.status === 'played' && updatedGame.winner && updatedGame.red_score !== undefined && updatedGame.blue_score !== undefined) {
+            alert(`Game completed! ${updatedGame.winner.charAt(0).toUpperCase() + updatedGame.winner.slice(1)} team wins! Final score: Red ${updatedGame.red_score} - Blue ${updatedGame.blue_score}`)
+            setTimeout(() => {
+              window.location.href = '/dashboard'
+            }, 2000)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [game])
 
   const canStartGame = game && 
     game.status === 'lobby' && 
@@ -892,17 +921,8 @@ export default function GamePage() {
           {(game?.status === 'played' || game?.status === 'cancelled') && (
             <Button
               onClick={async () => {
-                // Check if there are any existing lobby games before creating a new one
-                const { data: existingLobbyGames } = await supabase
-                  .from('games')
-                  .select('id')
-                  .eq('status', 'lobby')
-                
-                if (existingLobbyGames && existingLobbyGames.length > 0) {
-                  alert('There is already a game in lobby status. Please join that game instead.')
-                  return
-                }
-                
+                // Always create a new game when clicking "New Game"
+                console.log('Creating new game from New Game button...')
                 await createNewGame()
               }}
               className="bg-lambdaliga-primary hover:bg-lambdaliga-accent text-white px-8 py-3 text-lg border-lambdaliga-primary hover:border-lambdaliga-accent"
@@ -910,6 +930,18 @@ export default function GamePage() {
               New Game
             </Button>
           )}
+
+          {/* Always show a "Start New Game" button for easy access */}
+          <Button
+            onClick={async () => {
+              console.log('Creating new game from Start New Game button...')
+              await createNewGame()
+            }}
+            variant="outline"
+            className="bg-white hover:bg-gray-50 text-lambdaliga-primary border-lambdaliga-primary hover:border-lambdaliga-accent px-6 py-2 text-sm"
+          >
+            Start New Game
+          </Button>
         </div>
 
         {/* Game Info */}
